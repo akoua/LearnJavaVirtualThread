@@ -13,7 +13,7 @@ public class InBoundOutBoundTask {
     }
 
     /**
-     * Create a simple thread with Thread Builder*
+     * Create a simple thread with Thread Builder
      */
     public static void platformThreadDemo() {
 
