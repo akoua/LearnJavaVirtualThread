@@ -5,10 +5,11 @@ import java.util.stream.IntStream;
 
 public class InBoundOutBoundTask {
 
-    final static int NB_PLATFORM_THREAD = 10_000;
-    final static int NB_VIRTAUL_THREAD = 50_000;
+    final static int NB_PLATFORM_THREAD = 20;
+    final static int NB_VIRTAUL_THREAD = 10;
 
     public static void main(String[] args) throws InterruptedException {
+//        platformThreadDemo();
         virtualThreadDemo();
     }
 
@@ -46,7 +47,7 @@ public class InBoundOutBoundTask {
         var latch = new CountDownLatch(NB_VIRTAUL_THREAD);
         IntStream.range(0, NB_VIRTAUL_THREAD)
                 .forEach(value -> Thread.ofVirtual()
-                        .name("virtual-")
+                        .name("virtual-" + value)
                         .start(() -> {
                             Task.readFile(value);
                             latch.countDown();
