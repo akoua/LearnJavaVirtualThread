@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.print.attribute.standard.SheetCollate;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +23,7 @@ public class ScheduleTaskWithVirtualThread {
 
     public static void main(String[] args) {
 
-        scheduledTask(1_000);
+        scheduledTask(100_000);
     }
 
     static void scheduledTask(int numberOfTask) {
@@ -34,46 +36,59 @@ public class ScheduleTaskWithVirtualThread {
 //        ExecutorService executor = Executors.newCachedThreadPool();
 
         try (scheduler; executor) {
-            AtomicInteger productId = new AtomicInteger(1);
             AtomicInteger batchNumber = new AtomicInteger(1);
+            long scheduleBeginningTime = System.currentTimeMillis();
 
             scheduler.scheduleAtFixedRate(() -> {
+                log.info("::::::: NEW BATCH {} at {}ms from beginning ::::", batchNumber.get(), (System.currentTimeMillis() - scheduleBeginningTime));
                 long beginningTime = System.currentTimeMillis();
                 List<Future<?>> listOfTaskFuture = new ArrayList<>();
 
-                IntStream.range(0, numberOfTask)
-                        .forEach(value -> {
-                            Future<?> submitTask = executor.submit(() -> printProductInfo(productId.getAndIncrement()));
-                            listOfTaskFuture.add(submitTask);
-                        });
-                boolean taskState = listOfTaskFuture.stream()
-                        .allMatch(taskFuture -> {
-                            try {
-                                taskFuture.get();
-                                return true;
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                return false;
-                            }
-                        });
-                if (taskState) {
-                    log.info("::::Duration of batch {} treatment: {}ms", batchNumber.getAndIncrement(),
-                            (System.currentTimeMillis() - beginningTime));
-                }
+                try {
+                    BufferedWriter productFile = new BufferedWriter(new FileWriter(String.format("filename%s.txt", batchNumber.get())));
+                    IntStream.range(0, numberOfTask)
+                            .forEach(value -> {
+                                try {
+                                    Future<?> submitTask = executor.submit(() -> printProductInfo(value, productFile));
+                                    listOfTaskFuture.add(submitTask);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
 
+                    boolean taskState = listOfTaskFuture.stream()
+                            .allMatch(taskFuture -> {
+                                try {
+                                    taskFuture.get();
+                                    return true;
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    return false;
+                                }
+                            });
+                    if (taskState) {
+                        productFile.write("All time: " + (System.currentTimeMillis() - beginningTime) + "ms");
+                        productFile.close();
+                        log.info("::::Duration of batch {} treatment: {}ms of {} items ", batchNumber.getAndIncrement(),
+                                (System.currentTimeMillis() - beginningTime), listOfTaskFuture.size());
+                    }
+                } catch (Exception e) {
+                    //for debug only, nether for production
+                    e.printStackTrace();
+                }
             }, 0, 5, TimeUnit.SECONDS);
-            CommonUtils.sleep(Duration.ofSeconds(30));
+            CommonUtils.sleep(Duration.ofSeconds(11));
 
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static void printProductInfo(int id) {
+    private static void printProductInfo(int id, BufferedWriter file) {
         try {
-            log.info("Beginning: {} => {}", id, "Product " + id);
-            Thread.sleep(Duration.ofSeconds(2));
-            log.info("Ending: {} => {}", id, "Product " + id);
+//            log.info("Beginning: {} => {}", id, "Product " + id);
+            file.write("Product " + id + "\n");
+//            log.info("Ending: {} => {}", id, "Product " + id);
         } catch (Exception e) {
             e.printStackTrace();
         }
